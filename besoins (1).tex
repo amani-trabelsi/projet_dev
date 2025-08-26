@@ -1,0 +1,577 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[frenchb]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc} 
+\usepackage{lmodern}
+\usepackage{mathptmx}
+
+\usepackage{amsmath}
+\usepackage{etoolbox}
+\usepackage{float}
+\usepackage{geometry}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    pdftitle={Projet de Développement Logiciel - Cahier des besoins},
+    pdfpagemode=FullScreen,
+    }
+\usepackage{graphicx}
+%\usepackage[disable]{todonotes}
+\usepackage{todonotes}
+\usepackage{titlesec}
+\titleformat*{\section}{\Large\bfseries\sffamily}
+\titleformat*{\subsection}{\large\bfseries\sffamily}
+\titleformat*{\subsubsection}{\itshape\subsubsectionfont}
+
+\geometry{margin=2cm}
+
+\newcounter{besoin}
+
+% Descriptif des besoins:
+% 1 - Label du besoin pour référencement 
+% 2 - Titre du besoin
+% 3 - Description
+% 4 - Gestion d'erreurs
+% 5 - Spécifications tests
+\newcommand{\besoin}[6]{%
+  \refstepcounter{besoin}%
+  \fbox{\parbox{0.95\linewidth}{%
+    \begin{center}\label{besoin:#1}\textbf{\sffamily Besoin~\thebesoin~: #2}\end{center}
+    \ifstrempty{#3}{}{\textbf{Description~:} #3\par}
+    \vspace{0.5em}
+    \ifstrempty{#4}{}{\textbf{Gestion d'erreurs~:} #4\par}
+    \vspace{0.5em}
+    \ifstrempty{#5}{}{\textbf{Tests~:} #5\par}
+    \vspace{0.5em}
+    \ifstrempty{#6}{}{\textbf{Implémentations effectuées~:} #6\par} % Nouveau bloc ajouté
+  }}
+}
+
+\newcommand{\refBesoin}[1]{%
+  Besoin~\ref{besoin:#1}%
+}
+
+\title{\sffamily \textbf{Projet de Développement Logiciel}}
+\author{L3 Informatique -- Université de Bordeaux}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+
+\section{Introduction}
+
+Ce document présente les besoins nécessaires au développement d'une application
+de recherche d'image par similarité avec une architecture de type client-serveur s'appuyant sur une base de données pour l'indexation des images.
+Afin de permettre aux groupes d'approfondir un sujet qui les intéresse plus
+particulièrement, on propose la structure suivante.
+
+\begin{description}
+\item[Noyau commun :] Chaque groupe devra réaliser l'implémentation du fonctionnement central de l'application client-serveur. Elle est décrite dans la section~\ref{sec:kernel}. Notez qu'une partie des besoins a été développée dans les TP communs. Le code du noyau commun fera l'objet d'un rendu intermédiaire.
+  
+\item [Extensions :] Des suggestions d'extensions seront proposées en cours (amélioration de l'interface utilisateur, descripteurs d'image plus avancés, pagination des résultats, sessions utilisateur persistantes, gestion d'une arborescence de fichiers image, etc), mais vous êtes invités à faire vos propres propositions.
+  
+\end{description}
+
+
+Chaque groupe peut faire évoluer ce document avec l'aval de son chargé de TD. Le cahier des besoins fera partie des rendus.\\
+
+
+L'application devra permettre de traiter les images couleur enregistrées aux formats suivants :
+
+\begin{itemize}
+\item \verb!JPEG!
+\item \verb!PNG!
+\end{itemize}
+
+
+
+\section{\label{sec:kernel}Noyau commun}
+
+\subsection{Serveur}
+
+\besoin{server:initImages}
+{Initialiser un ensemble d'images présentes sur le serveur}
+{
+  Lorsque le serveur est lancé, il doit charger toutes les images présentes à l'intérieur du dossier \verb!images! et les indexer dans une base de données (cf. \refBesoin{server:indexImage}). Ce dossier \verb!images! doit exister à l'endroit où est lancé le serveur. Seuls les fichiers images correspondants aux formats d'image reconnus doivent être traités. Les sous-dossiers du dossier \verb!images! ne seront pas traités.
+}
+{
+  Si le dossier \verb!images! n'existe pas depuis l'endroit où a été lancé le
+  serveur, une erreur explicite doit être levée.
+}
+{
+  \begin{enumerate}
+  \item Lancement de l'exécutable depuis un environnement vide, une erreur doit
+    se déclencher indiquant que le dossier \verb!images! n'est pas présent.
+  \item Mise en place d'un dossier de test contenant des images aux formats reconnus ainsi que des documents avec des extensions non-reconnues comme étant des images (e.g.,~\verb!.txt!).
+  \end{enumerate}
+}
+{
+  \textbf{}  
+  Tout d'abord, nous avons créé les tables de la base de données via \texttt{initializeDatabase()} en utilisant des requêtes SQL.
+  
+  L'initialisation des images présentes sur le serveur a été mise en place via la méthode \texttt{loadImagesAndHistos()}. Cette méthode :
+
+\begin{itemize}
+    \item Vérifie l'existence du dossier \texttt{images}. Si celui-ci est absent, une erreur explicite est levée.
+    \item Filtre les fichiers en fonction de leurs extensions afin de ne traiter que les images aux formats reconnus (\texttt{.png}, \texttt{.jpg}, \texttt{.jpeg}).
+    \item Convertit chaque fichier image en objet \texttt{Image}, qui stocke son nom, son type, sa taille et les données de l'image.
+    \item Insère les images dans la base de données via \texttt{addImageToDB(Image image)}.
+\end{itemize}
+}
+
+\besoin{server:manageImages}
+{Gérer les images présentes sur le serveur}
+{  
+    Le serveur gère un ensemble d'images. Il permet d'accéder aux données brutes de chaque image ainsi qu'aux méta-données nécessaires aux réponses aux requêtes (identifiant, nom de fichier, taille de l'image, format,...). Le serveur peut :
+
+    \begin{enumerate}
+    \item accéder à une image via son identifiant,
+    \item supprimer une image via son identifiant,
+    \item ajouter une image,
+    \item construire la liste des images disponibles (composée uniquement des métadonnées).
+    \end{enumerate}
+
+    Le serveur garantit la persistance des données : le dossier \verb!images! contient à tout moment l'ensemble des images disponibles qui sont également indexées dans la base de données.
+}
+{}
+{}
+{
+  \textbf{}
+  Ces opérations sont implémentées en utilisant \texttt{JdbcTemplate} pour interagir avec la base de données. Les requêtes SQL suivantes sont utilisées:
+  \begin{enumerate}
+    \item SELECT * FROM images WHERE id = ?
+    \item DELETE FROM histogrammes WHERE id = ?
+    \item INSERT INTO images (id, name, data) VALUES (?, ?, ?)
+    \item SELECT * FROM images
+    \end{enumerate}
+}
+
+\besoin{server:indexImage}
+{Indexer une image}
+{
+  Le serveur permet d'indexer une image c'est-à-dire d'ajouter dans une base de données un enregistrement correspondant à l'image (identifiant et descripteur). Les descripteurs supportés sont l'histogramme 2D Teinte/Saturation et l'histogramme 3D RGB de l'image.
+}
+{}
+{}
+{
+  \textbf{} 
+L'indexation des images dans la base de données a été réalisée en ajoutant une table \texttt{histogrammes} pour chaque image comprenant :
+
+\begin{itemize}
+    \item L'identifiant de l'image comme clé primaire et étrangère référant l'ID dans la table \texttt{images}.
+    \item Les descripteurs associés : histogramme 2D Teinte/Saturation et histogramme 3D RGB.
+\end{itemize}
+}
+
+\besoin{server:searchBySimilarity}
+{Rechercher des images similaires à une image donnée}
+{
+  Le serveur permet de construire la liste des \verb!N! images les plus similaires à une image donnée pour un descripteur donné.
+}
+{}
+{}
+{
+  \textbf{}
+ Les histogrammes sont utilisés pour évaluer la similarité entre les images en utilisant la distance euclidienne dans la classe \texttt{HistoEtSimilarite.java}.
+ 
+ Un score de similarité est calculé pour toutes les images présentes dans la base de données par rapport à une image donnée en paramètre. Ce score permet de trier les images de la plus similaire à la moins similaire. Les \texttt{N} images les plus proches sont retournées dans une liste, offrant ainsi un classement des résultats selon leur ressemblance visuelle.
+}
+
+\newpage
+
+\subsection{Communication}
+
+Pour l'ensemble des besoins, des codes d'erreurs à renvoyer sont précisés dans le paragraphe "Gestion d'erreurs" (à compléter si nécessaire). \\
+
+
+\besoin{comm:listImages}
+{Transférer la liste des images existantes}
+{
+  La liste des images présentes sur le serveur doit être envoyée par le serveur lorsqu'il reçoit une requête \verb!GET! à l'adresse \verb!/images!.
+
+  Le résultat sera fourni au format \verb!JSON!, sous la forme d'un tableau
+  contenant pour chaque image un objet avec les informations suivantes :
+  \begin{description}
+  \item[Id:] L'identifiant auquel est accessible l'image (type \verb!long!)
+  \item[Name:] Le nom du fichier qui a servi à construire l'image (type \verb!string!)
+  \item[Type:] Le type de l'image (type \verb!org.springframework.http.MediaType!) 
+  \item[Size:] Une description de la taille de l'image, par exemple \verb!640*480! pour
+    une image de $640 \times 480$ pixels (type \verb!string!)
+  \end{description}
+}
+{}
+{
+  Pour le dossier de tests spécifié dans \refBesoin{server:initImages}, la
+  réponse attendue doit être comparée à la réponse reçue lors de l'exécution de la commande.
+}
+{
+  \textbf{}
+  Nous avons implémenté une méthode qui récupère la liste des images disponibles sur le serveur en réponse à une requête GET à l'URL \texttt{/images}.
+  
+  La méthode génère une réponse JSON contenant un tableau d'objets. Chaque objet représente une image et contient les informations suivantes :
+
+\begin{itemize}
+  \item \textbf{Id} : Identifiant unique de l'image.
+  \item \textbf{Name} : Nom du fichier utilisé pour construire l'image.
+  \item \textbf{Type} : Type MIME de l'image.
+  \item \textbf{Size} : Taille de l'image.
+  \item \textbf{Bytes} : Données de l'image encodées en base64.
+\end{itemize}
+}
+
+\besoin{comm:create}
+{Ajouter une image}
+{
+  L'envoi d'une requête \verb!POST! à l'adresse \verb!/images! avec
+  des données de type multimedia dans le corps de la requête doit ajouter une
+  image à celles disponibles sur le serveur (voir \refBesoin{server:manageImages}).
+}
+{
+  \begin{description}
+  \item[201 Created:] La requête s'est bien exécutée et l'image est à présent
+    sur le serveur.
+  \item[415 Unsupported Media Type:] La requête a été refusée car le serveur ne
+    supporte pas le format reçu (par exemple \verb!EXR!).
+  \end{description}
+}
+{}
+{
+  \textbf{}
+  Nous avons implémenté une méthode permettant d'ajouter une image sur le serveur en envoyant une requête POST à l'URL \texttt{/images}.
+  
+  La méthode vérifie d'abord le type de contenu de l'image envoyée pour s'assurer qu'il s'agit bien d'un fichier au format JPEG ou PNG. Si le format est valide, l'image est ajoutée à la base de données.
+  \item En cas de succès, une réponse avec le statut HTTP \texttt{201 Created} est renvoyée, indiquant que l'image a été correctement ajoutée.
+  \item Si le format n'est pas supporté, le serveur renvoie une erreur \texttt{415 Unsupported Media Type}.
+}
+
+\besoin{comm:retrieve}
+{Récupérer une image}
+{
+  L'envoi d'une requête \verb!GET! à une adresse de la forme \verb!/images/id!
+  doit renvoyer l'image stockée sur le serveur avec l'identifiant \verb!id! (entier positif). En cas de succès, l'image est retournée dans le corps de la réponse.
+}
+{
+  \begin{description}
+  \item[200 OK:] L'image a bien été récupérée.
+  \item[404 Not Found:] Aucune image existante avec l'identifiant \verb!id!.
+  \end{description}
+}
+{}
+{
+  \textbf{} 
+  Nous avons implémenté une méthode permettant de récupérer une image à partir de son identifiant en envoyant une requête GET à l'URL \texttt{/images/{id}}.
+  
+  La méthode cherche l'image correspondante dans la base de données et, si elle existe, renvoie l'image sous forme de données JSON, y compris ses informations (ID, nom, type, taille et données en base64).
+  \item En cas de succès, une réponse \texttt{200 OK} est renvoyée avec les informations de l'image.
+  \item Si aucune image n'est trouvée avec l'identifiant donné, une erreur \texttt{404 Not Found} est renvoyée avec un message d'erreur.
+}
+
+\besoin{comm:delete}
+{Supprimer une image}
+{
+  L'envoi d'une requête \verb!DELETE! à une adresse de la forme \verb!/images/id!
+  doit effacer l'image stockée avec l'identifiant \verb!id! (entier positif). Voir \refBesoin{server:manageImages}.
+}
+{
+  \begin{description}
+  \item[200 OK:] L'image a bien été effacée.
+  \item[404 Not Found:] Aucune image existante avec l'identifiant \verb!id!.
+  \end{description}
+}
+{}
+{
+  \textbf{}
+  Nous avons implémenté une méthode permettant de supprimer une image en envoyant une requête DELETE à l'URL \texttt{/images/{id}}.
+  
+  La méthode recherche l'image correspondante dans la base de données à l'aide de son identifiant.
+  \item Si l'image existe, elle est supprimée et une réponse \texttt{200 OK} est renvoyée avec un message de confirmation.
+  \item Si aucune image n'est trouvée avec l'identifiant donné, une erreur \texttt{404 Not Found} est renvoyée avec un message d'erreur indiquant que l'image n'a pas été trouvée.
+}
+
+\besoin{comm:getsimilar}
+{Transférer la liste des images les plus similaires à une image donnée}
+{
+    Lors d'une requête \verb!GET! à une adresse de la forme \verb!/images/id/similar?number=N\&descriptor=DESCR! le serveur envoie la liste des \verb!N! images les plus similaires à l'image d'identifiant \verb!id! selon le descripteur \verb!DESCR!.
+
+    Le résultat sera fourni au format \verb!JSON!, sous la forme d'un tableau
+  contenant les informations de chaque image (comme pour le \refBesoin{comm:listImages})
+}
+{
+  \begin{description}
+  \item[200 OK:] La requête a bien été traitée.
+  \item[400 Bad Request:] La requête ne peut être traitée, par exemple si la valeur du paramètre \verb!descriptor! ne correspond pas à un descripteur disponible.
+  \item[404 Not Found:] Aucune image existante avec l'indice \verb!id!.
+  \end{description}
+}
+{}
+{
+  \textbf{}
+  Nous avons implémenté une méthode pour répondre à la requête GET à l'adresse \texttt{/images/id/similar?number=N&descriptor=DESCR}. Les étapes suivantes sont réalisées :
+\begin{itemize}
+    \item Vérification que le descripteur est valide (\texttt{histoRGB}, \texttt{histoTeinteSaturation}, ou \texttt{combined}).
+    \item Récupération de l'image via son ID. Si elle n'existe pas, une erreur 404 est renvoyée.
+    \item Calcul de la similarité entre l'image requise et les autres images selon le descripteur.
+    \item Construction d'un tableau JSON avec les N images les plus similaires, incluant leur ID, nom, type, taille et données encodées en base64.
+\end{itemize}
+}
+
+\newpage
+
+\subsection{Client}
+Les actions que peut effectuer l'utilisateur côté client induisent des requêtes envoyées au serveur. En cas d'échec d'une requête, le client doit afficher un message d'erreur explicatif.\\
+
+\besoin{client:viewImages}
+{Parcourir les images disponibles sur le serveur}
+{
+  L'utilisateur peut visualiser les images disponibles sur le serveur. La présentation visuelle peut prendre la forme d'un carroussel ou d'une galerie d'images. On suggère que chaque vignette contenant une image soit de taille fixe (relativement à la page affichée). Suivant la taille de l'image initiale la vignette sera complètement remplie en hauteur ou en largeur.
+}
+{}
+{}
+{
+  \textbf{} Le client communique avec le serveur en utilisant la fonction getImageList du backend, appelée dans le fichier http-api.ts. Le serveur renvoie un fichier JSON contenant l'ID, le nom et les données des images. Ces images sont envoyées sous forme de flux de bytes, encodées en base64 dans la réponse JSON. Le client les décode ensuite pour les afficher dans une galerie.
+}
+
+\besoin{client:selectImage}
+{Sélectionner une image et afficher les images similaires}
+{
+  L'utilisateur peut cliquer sur la vignette correspondant à une image. L'image est affichée sur la page. L'utilisateur peut visualiser les méta-données de l'image. L'utilisateur peut choisir d'afficher les images similaires disponibles. Il peut préciser le nombre d'images similaires à afficher et le descripteur utilisé pour la mesure de similarité. Pour chaque image similaire est affiché un score de similarité.
+}
+{}
+{}
+{
+  \textbf{} Dans Gallery.vue, l'image sélectionnée est envoyée à Similarity.vue via une prop. Ensuite, dans Similarity.vue, la fonction fetchSimilarImages est déclenchée pour appeler le backend avec la méthode getSimilarImages, en utilisant le descripteur et le nombre d'images à afficher choisis par l'utilisateur dans le formulaire. Le backend renvoie un fichier JSON contenant les images similaires, qui sont ensuite affichées à partir les bytes.
+}
+
+
+\besoin{client:saveImage}
+{Enregistrer une image sur disque}
+{
+  L'utilisateur peut sauvegarder dans son système de fichier une image chargée.
+}
+{}
+{}
+{
+  \textbf{} La fonction downloadImage dans Gallery.vue a été implémentée pour permettre à l'utilisateur de télécharger une image. Lorsqu'il clique sur "Download", un lien <a> est généré, pointant vers l'image en base64, avec un attribut download pour définir le nom du fichier. Un clic simulé sur ce lien déclenche automatiquement le téléchargement de l'image, permettant ainsi à l'utilisateur de la sauvegarder facilement sur son système de fichiers.
+}
+
+\besoin{client:createImage}
+{Ajouter une image aux images disponibles sur le serveur}
+{
+  L'utilisateur peut ajouter une image choisie dans son système de fichier aux images disponibles sur le serveur. Cet ajout est persistant (un fichier est ajouté côté serveur).
+}
+{}
+{}
+{
+  \textbf{} Dans l'interface Upload.vue, l'utilisateur choisit une image avec un champ de type file. Quand l'image est sélectionnée, elle est envoyée au serveur sous forme de FormData grâce à la fonction submitFile. Le serveur reçoit et enregistre l'image. Si tout se passe bien, un message de confirmation s'affiche, et l'image est ajoutée à la liste des images. La fonction addImage dans App.vue met à jour imageList en ajoutant la nouvelle image et recharge la liste des images avec loadImageList.
+}
+
+
+
+\besoin{client:delete}
+{Supprimer une image}
+{
+  Le client peut choisir de supprimer une image préalablement sélectionnée. Elle n'apparaîtra plus dans les images disponibles sur le serveur. Cette suppression est persistante (un fichier est supprimé côté serveur).
+}
+{}
+{}
+{
+  \textbf{} Dans l'interface App.vue, la fonction deleteImage gère la suppression d'une image. Lorsqu'une image est supprimée, son ID est envoyé à l'API via await api.deleteImage(imageId), qui supprime l'image côté serveur. Ensuite, l'image est retirée de la liste locale imageList à l'aide de findIndex() et splice(). 
+}
+
+%% \newpage
+
+%% \subsection{Traitement d'images}
+%% \label{tai}
+
+%% \besoin{tai:luminosity}
+%% {Réglage de la luminosité}
+%% {L'utilisateur peut augmenter ou diminuer la luminosité de l'image sélectionnée.}
+%% {}
+%% {}
+
+%% \besoin{tai:equalizeHist}
+%% {Égalisation d'histogramme}
+%% {L'utilisateur peut appliquer une égalisation d'histogramme à l'image sélectionnée. L'égalisation sera apliquée au choix sur le canal S ou V de l'image représentée dans l'espace HSV.}
+%% {}
+%% {}
+
+%% \besoin{tai:setHue}
+%% {Filtre coloré}
+%% {L'utilisateur peut choisir la teinte de tous les pixels de l'image sélectionnée de façon à obtenir un effet de filtre coloré.}
+%% {}
+%% {}
+
+%% \besoin{tai:blur}
+%% {Filtres de flou}
+%% {L'utilisateur peut appliquer un flou à l'image sélectionnée. Il peut définir le filtre appliqué (moyen ou gaussien) et choisir le niveau de flou. La convolution est appliquée sur les trois canaux R, G et B.}
+%% {}
+%% {}
+
+%% \besoin{tai:contour}
+%% {Filtre de contour}
+%% {L'utilisateur peut appliquer un détecteur de contour à l'image sélectionnée. Le résultat sera issu d'une convolution par le filtre de Sobel. La convolution sera appliquée sur la version en niveaux de gris de l'image.}
+%% {}
+%% {}
+
+\newpage
+
+\subsection{Besoins non-fonctionnels}
+
+\besoin{bnf:ci}
+{Intégration continue}
+{
+  Les outils de Gitlab permettant le développement partagé et l'intégration continue seront utilisés pour :
+  \begin{itemize}
+    \item le versionnage,
+    \item la gestion des tickets,
+    \item la compilation de l'application,
+    \item l'exécution des tests.
+  \end{itemize}
+  
+}
+{}
+{}
+{}
+
+
+\besoin{bnf:serverCompatibility}
+{Compatibilité du serveur}
+{
+  La partie serveur de l'application sera écrite en Java (JDK 17) avec les
+  bibliothèques suivantes:
+  \begin{itemize}
+  \item \verb!org.springframework.boot! : version 3.2.x
+  \item \verb!org.boofcv! : version 1.1.2
+  \item \verb!org.postgresql! : version 42.7.1
+  \item \verb!com.pgvector!: version 0.1.4
+  \end{itemize}
+
+  La base de données utilisée sera PostgreSQL avec l'extension \verb!pgvector!. Spring JDBC sera utilisé pour faire le lien avec la base.\\
+
+  Le fonctionnement du serveur devra être éprouvé sur au moins un des environnements suivants :
+  \begin{itemize}
+  \item Windows $\ge$ 10
+  \item Ubuntu $\ge$ 20.04
+  \item Debian Bookworm
+  \item MacOS $\ge$ 11
+  \end{itemize}
+}
+{}
+{}
+{}
+
+
+\besoin{bnf:clientCompatibility}
+{Compatibilité du client}
+{
+  Le client sera écrit en TypeScript et s'appuiera sur la version \verb!3.x! du
+  framework \verb!Vue.js!.\\
+
+  Le client devra être testé sur au moins l'un des navigateurs Web suivants,
+  la version à utiliser n'étant pas imposée :
+  \begin{itemize}
+  \item Safari
+  \item Google Chrome
+  \item Firefox
+  \end{itemize}
+}
+{}
+{}
+{}
+
+\besoin{bnf:documentation}
+{Documentation d'installation et de test}
+{
+  La racine du projet devra contenir un fichier \verb!README.md! indiquant au
+  moins les informations suivantes:
+  \begin{itemize}
+  \item Système(s) d'exploitation sur lesquels votre serveur a été testé, voir
+    \refBesoin{bnf:serverCompatibility}.
+  \item Navigateur(s) web sur lesquels votre client a été testé incluant la
+    version de celui-ci, voir \refBesoin{bnf:clientCompatibility}.
+  \end{itemize}
+  
+}
+{}
+{}
+{}
+
+\newpage
+
+\section{\label{sec:kernel}Nouvelles fonctionnalités}
+
+\besoin{Authentification}
+{Permettre aux utilisateurs de s’authentifier pour accéder à l’application}
+{
+  Le système doit permettre à un utilisateur de s’authentifier à l’aide d’un identifiant (adresse e-mail) et d’un mot de passe. Deux cas sont possibles :
+  
+  \begin{itemize}
+    \item \textbf{Connexion (Login)} : si l’utilisateur possède déjà un compte, il peut se connecter en saisissant ses identifiants. Les informations saisies doivent être comparées avec celles stockées dans la base de données des utilisateurs. Si les identifiants sont corrects, l’utilisateur accède à une session personnalisée, incluant sa galerie de favoris. Dans le cas contraire, un message d’erreur explicite doit être affiché.
+    
+    \item \textbf{Inscription (Sign Up)} : si l’utilisateur n’a pas encore de compte, il peut en créer un via un formulaire d’inscription. Les données sont ensuite enregistrées dans la base de données, le mot de passe étant stocké de manière sécurisée (crypté). Une fois inscrit, l’utilisateur est automatiquement connecté et redirigé vers une galerie de favoris vide.
+  \end{itemize}
+}
+{}
+{}
+{
+  \textbf{}Nous avons créé une table user dans la base de données, contenant les informations nécessaires à l’authentification des utilisateurs, telles que le nom, l’adresse e-mail, le mot de passe (crypté à l’aide de BCryptPasswordEncoder du package org.springframework.security.crypto.bcrypt) ainsi qu’une liste d’images favorites propre à chaque utilisateur.
+  
+  Côté frontend, une interface utilisateur a été développée pour permettre aux utilisateurs de se connecter ou de s’inscrire via un formulaire. Les informations saisies (e-mail, mot de passe, nom) sont envoyées à l’API grâce à des méthodes asynchrones.
+  
+  Lors d’une tentative de connexion, en cas de succès, les données utilisateur sont stockées dans le localStorage pour maintenir la session et rediriger vers la page d’accueil.
+  
+  Un système de routage a été mis en place pour limiter l’accès aux pages en fonction de l’authentification. Les utilisateurs non connectés sont automatiquement redirigés vers la page de connexion.
+}
+
+\besoin{Gestion des favoris}
+{Permettre aux utilisateurs d'ajouter des images à leur galerie de favoris}
+{
+Le système doit permettre à chaque utilisateur d’ajouter des images à sa galerie de favoris. Lorsqu’un utilisateur est authentifié, il peut sélectionner des images qu’il souhaite enregistrer comme favorites. Ces images doivent être associées à son compte dans la base de données.
+
+Les utilisateurs peuvent ajouter ou supprimer des images de leur galerie de favoris à tout moment. Lors de l’ajout, l’image est enregistrée dans la base de données, associée à l’identifiant unique de l’utilisateur. Lors de la suppression, l’image est retirée de la galerie de l’utilisateur, et cette modification est immédiatement reflétée dans la base de données.
+
+Chaque utilisateur ne peut accéder qu’à sa propre galerie de favoris, garantissant ainsi la confidentialité et la sécurité des données.
+}
+{}
+{}
+{
+\textbf{}Nous avons ajouté une colonne favorites dans la table user pour enregistrer les noms des images favorites de chaque utilisateur. À la connexion, ces images sont récupérées depuis la base de données.
+
+Côté frontend, le composant Favorites.vue utilise les informations de l’utilisateur (email et mot de passe), récupérées depuis le localStorage, pour appeler la fonction getLikedImages(). Celle-ci interroge le backend et retourne un fichier JSON contenant les images favorites, qui sont ensuite affichées dans la galerie.
+
+}
+
+\besoin{Ajustement de la luminosité}
+{Permettre aux utilisateurs d'ajuster la luminosité d'une image sélectionnée}
+{ Cette fonctionnalité permet aux utilisateurs d'ajuster la luminosité d'une image en fonction d'un delta spécifié.}
+{}
+{}
+{
+\textbf{}Nous avons ajouté une méthode qui parcourt chaque pixel de l'image, ajuste sa luminosité en fonction du delta et veille à ce que les valeurs restent dans la plage [0, 255]. L'API reçoit ensuite l'ID de l'image et le delta en paramètres, récupère l'image depuis la base de données, applique l'ajustement de luminosité, et renvoie l'image modifiée sous forme de fichier JSON. 
+
+  Côté frontend, les données JSON sont utilisées pour afficher directement l'image filtrée.
+
+}
+
+\besoin{Recherche d'images par nom}
+{Permettre aux utilisateurs de rechercher des images par leur nom}
+{
+    Le système doit offrir aux utilisateurs la possibilité de filtrer la collection d'images en fonction de leur nom. La recherche doit être dynamique et réactive, s'actualisant à mesure que l'utilisateur tape sa requête. Le système doit effectuer une recherche insensible à la casse afin de faciliter l'expérience utilisateur. La barre de recherche doit être visible uniquement dans la vue galerie.
+}
+{}
+{}
+{
+\textbf{} Nous avons implémenté une barre de recherche interactive placée en haut de l'interface principale de la galerie.
+
+Cette fonctionnalité utilise une variable réactive (searchTerm) pour capturer la saisie de l'utilisateur, couplée à une propriété calculée (filteredImages) qui filtre dynamiquement la liste d'images en temps réel.
+
+Le mécanisme de filtrage vérifie si le nom de chaque image (converti en minuscules) commence par le terme recherché (également converti en minuscules), garantissant ainsi une recherche insensible à la casse. Lorsque le champ de recherche est vide, toutes les images sont affichées dans la galerie.
+
+}
+
+\end{document}
