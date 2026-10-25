@@ -1,0 +1,19 @@
+# Dépendances frontend
+frontend/node_modules/
+
+# Fichiers générés
+frontend/dist/
+backend/target/
+
+# Secrets et configuration locale
+.env
+.env.*
+!.env.example
+application-local.properties
+
+# IDE et système
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+backend/src/main/resources/application.properties
