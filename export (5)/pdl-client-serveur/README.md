@@ -1,4 +1,4 @@
-# PDL Client-Serveur
+# Projet dev
 
 Application web de traitement et de gestion d’images, composée d’un frontend développé avec Vue.js et d’un backend Java Spring Boot connecté à une base de données PostgreSQL.
 
