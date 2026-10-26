@@ -27,6 +27,3 @@ Ce dépôt contient le projet de développement client-serveur consacré à la g
 
 Consultez le [README détaillé de l’application](export%20%285%29/pdl-client-serveur/README.md) pour les instructions d’installation, de configuration et de lancement du frontend et du backend.
 
-## Auteur
-
-Amani Trabelsi
