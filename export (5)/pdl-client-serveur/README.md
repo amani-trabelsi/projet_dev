@@ -136,8 +136,5 @@ Le backend doit être démarré pour que le frontend puisse communiquer avec lui
 - Conservez `application.example.properties` comme modèle de configuration.
 - Vérifiez les fichiers suivis par Git avant chaque publication.
 
-## 👩‍💻 Auteur
-
-**Amani Trabelsi**
 
 Projet de développement client-serveur.
