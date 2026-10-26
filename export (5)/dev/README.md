@@ -36,7 +36,7 @@ Ce projet permet de manipuler des images depuis une interface web et de réalise
 ## 📁 Structure du projet
 
 ```text
-pdl-client-serveur/
+dev/
 ├── frontend/                  # Interface utilisateur Vue.js
 ├── backend/                   # Application Spring Boot
 │   ├── src/
